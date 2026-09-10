@@ -1,10 +1,3 @@
-// const themeBtn = document.getElementById("themeBtn");
-
-// themeBtn.addEventListener("click", function () {
-
-//     document.body.classList.toggle("dark");
-
-// });
 const themeBtn = document.getElementById("themeBtn");
 
 themeBtn.addEventListener("click", function () {
@@ -22,155 +15,260 @@ themeBtn.addEventListener("click", function () {
 // WEATHER SEARCH
 // ===============================
 
-const API_KEY = "YOUR_API_KEY_HERE";
-
-const cityInput = document.getElementById("cityInput");
-const searchBtn = document.getElementById("searchBtn");
-
-const weatherCard = document.getElementById("weatherCard");
-const loading = document.getElementById("loading");
-const errorMsg = document.getElementById("errorMsg");
+const API_KEY = 'a932f6988cbc282c83490aa219dbea0b';
 
 
 // ===============================
-// GET WEATHER FROM API
+// 1. GET WEATHER
 // ===============================
 
 async function getWeather(city) {
 
-    const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`
-    );
+    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`;
 
-    if (!response.ok) {
-        throw new Error("City not found");
-    }
+    const response = await fetch(url);
 
     const data = await response.json();
+
+    console.log("API Response:", data);
+
+    if (!response.ok) {
+        throw new Error(data.message || "Weather request failed");
+    }
 
     return data;
 }
 
 
 // ===============================
-// DISPLAY WEATHER
+// 2. ADD FAVORITE
 // ===============================
 
-function displayWeather(data) {
+function addFavorite(city) {
 
-    weatherCard.innerHTML = `
+    let favorites =
+        JSON.parse(localStorage.getItem("favorites")) || [];
 
-        <div class="weather-main">
+    if (favorites.includes(city)) {
+        return;
+    }
 
-            <div>
-                <h2>${data.name}, ${data.sys.country}</h2>
+    favorites.push(city);
 
-                <p>
-                    ${data.weather[0].description}
-                </p>
+    localStorage.setItem(
+        "favorites",
+        JSON.stringify(favorites)
+    );
 
-                <h1 class="temperature">
-                    ${Math.round(data.main.temp)}°C
-                </h1>
-            </div>
-
-        </div>
-
-
-        <div class="weather-details">
-
-            <div class="detail">
-                <strong>Feels Like</strong>
-                <p>${Math.round(data.main.feels_like)}°C</p>
-            </div>
-
-            <div class="detail">
-                <strong>Humidity</strong>
-                <p>${data.main.humidity}%</p>
-            </div>
-
-            <div class="detail">
-                <strong>Wind Speed</strong>
-                <p>${data.wind.speed} m/s</p>
-            </div>
-
-            <div class="detail">
-                <strong>Pressure</strong>
-                <p>${data.main.pressure} hPa</p>
-            </div>
-
-        </div>
-
-    `;
-
-    weatherCard.classList.remove("hidden");
+    loadFavorites();
 }
 
 
 // ===============================
-// SEARCH WEATHER
+// 3. LOAD FAVORITES
+// ===============================
+
+function loadFavorites() {
+
+    const favoritesList =
+        document.getElementById("favoritesList");
+
+    const favorites =
+        JSON.parse(localStorage.getItem("favorites")) || [];
+
+    favoritesList.innerHTML = "";
+
+    favorites.forEach(function (city) {
+
+        const button = document.createElement("button");
+
+        button.textContent = city;
+
+        button.addEventListener("click", function () {
+            searchWeather(city);
+        });
+
+        favoritesList.appendChild(button);
+    });
+}
+
+
+// ===============================
+// 4. SEARCH WEATHER
 // ===============================
 
 async function searchWeather(city) {
+
+    city = city.trim();
+
+    if (city === "") {
+        return;
+    }
+
+    const loading =
+        document.getElementById("loading");
+
+    const errorMsg =
+        document.getElementById("errorMsg");
+
+    const weatherCard =
+        document.getElementById("weatherCard");
+
 
     try {
 
         // Show loading
         loading.classList.remove("hidden");
 
-        // Hide previous error
+        // Hide old error
         errorMsg.classList.add("hidden");
 
-        // Hide old weather
-        weatherCard.classList.add("hidden");
-
-
         // Get weather
-        const data = await getWeather(city);
-
-
-        // Display weather
-        displayWeather(data);
-
-    }
-
-    catch (error) {
-
-        errorMsg.textContent = error.message;
-
-        errorMsg.classList.remove("hidden");
-
-    }
-
-    finally {
+        const result = await getWeather(city);
 
         // Hide loading
         loading.classList.add("hidden");
 
-    }
+        // Show weather card
+        weatherCard.classList.remove("hidden");
 
+
+        weatherCard.innerHTML = `
+
+            <h2>${result.name}</h2>
+
+            <p class="temperature">
+                ${Math.round(result.main.temp)}°C
+            </p>
+
+            <p>
+                Feels like:
+                ${Math.round(result.main.feels_like)}°C
+            </p>
+
+            <p>
+                Humidity:
+                ${result.main.humidity}%
+            </p>
+
+            <p>
+                Weather:
+                ${result.weather[0].description}
+            </p>
+
+            <p>
+                Wind:
+                ${result.wind.speed} m/s
+            </p>
+
+            <button id="favoriteBtn">
+                ⭐ Add to Favorites
+            </button>
+
+        `;
+
+
+        // Favorite button
+        document
+            .getElementById("favoriteBtn")
+            .addEventListener("click", function () {
+
+                addFavorite(result.name);
+
+            });
+
+
+    } catch (error) {
+
+        console.error("Weather Error:", error);
+
+        loading.classList.add("hidden");
+
+        weatherCard.classList.add("hidden");
+
+        errorMsg.textContent =
+            "Error: " + error.message;
+
+        errorMsg.classList.remove("hidden");
+    }
 }
 
 
 // ===============================
-// SEARCH BUTTON
+// 5. DEBOUNCE
 // ===============================
 
-searchBtn.addEventListener("click", function () {
+function debounceSearch() {
 
-    const city = cityInput.value.trim();
+    let timer;
+
+    return function (city) {
+
+        clearTimeout(timer);
+
+        timer = setTimeout(function () {
+
+            searchWeather(city);
+
+        }, 500);
+    };
+}
 
 
-    if (city === "") {
+const debouncedSearch = debounceSearch();
 
-        errorMsg.textContent = "Please enter a city name";
 
-        errorMsg.classList.remove("hidden");
+// ===============================
+// 6. CITY INPUT
+// ===============================
 
-        return;
+const cityInput =
+    document.getElementById("cityInput");
+
+
+cityInput.addEventListener("input", function (e) {
+
+    const city = e.target.value;
+
+    if (city.trim() !== "") {
+
+        debouncedSearch(city);
+
     }
+});
 
 
-    searchWeather(city);
+// ===============================
+// 7. DOM LOADED
+// ===============================
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    loadFavorites();
+
+
+    // Search button
+    document
+        .getElementById("searchBtn")
+        .addEventListener("click", function () {
+
+            const city =
+                document.getElementById("cityInput").value;
+
+            searchWeather(city);
+
+        });
+
+
+    // Enter key
+    cityInput.addEventListener("keydown", function (e) {
+
+        if (e.key === "Enter") {
+
+            searchWeather(cityInput.value);
+
+        }
+
+    });
 
 });
